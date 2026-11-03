@@ -4,7 +4,7 @@
 #include <BLEUtils.h>
 #include <BLEAdvertising.h>
 
-#define DHTPIN 4
+#define DHTPIN 13
 #define DHTTYPE DHT11
 
 struct RawMeasurement {
@@ -77,23 +77,31 @@ void TaskTransmission(void *pvParameters) {
 
   for (;;) {
     if (xQueueReceive(processedDataQueue, &outData, portMAX_DELAY) == pdPASS) {
+
       BLEAdvertisementData oAdvertisementData = BLEAdvertisementData();
       oAdvertisementData.setFlags(0x06);
-      
       oAdvertisementData.setName("ESP32");
 
-      std::string mfgData = "";
+      String mfgData = "";
       mfgData += (char)0xFF;
       mfgData += (char)0xFF;
       mfgData += outData.payloadString;
-
       oAdvertisementData.setManufacturerData(mfgData);
+
+      BLEAdvertisementData oScanResponseData = BLEAdvertisementData();
+      
+      String scanRespPayload = "";
+      scanRespPayload += (char)0xFF;
+      scanRespPayload += (char)0xFF;
+      scanRespPayload += "Ala ma kota";
+      oScanResponseData.setManufacturerData(scanRespPayload);
 
       pAdvertising->stop();
       pAdvertising->setAdvertisementData(oAdvertisementData);
+      pAdvertising->setScanResponseData(oScanResponseData);
       pAdvertising->start();
 
-      Serial.printf("Adv: %s\n", outData.payloadString);
+      Serial.printf("Adv: %s | ScanRsp: Ala ma kota\n", outData.payloadString);
     }
   }
 }
@@ -104,8 +112,9 @@ void setup() {
 
   BLEDevice::init("ESP32");
   pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->setAdvertisementType(ADV_TYPE_NONCONN_IND);
-  pAdvertising->setScanResponse(false);
+  
+  pAdvertising->setAdvertisementType(ADV_TYPE_SCAN_IND);
+  pAdvertising->setScanResponse(true);
 
   rawDataQueue = xQueueCreate(5, sizeof(RawMeasurement));
   processedDataQueue = xQueueCreate(5, sizeof(ProcessedMeasurement));
